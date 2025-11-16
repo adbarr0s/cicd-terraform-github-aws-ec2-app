@@ -1,0 +1,35 @@
+name: Deploy app to EC2
+
+on:
+  workflow_dispatch:
+    inputs:
+      EC2_HOST:
+        description: "EC2 public IP or DNS"
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout app code
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ github.event.inputs.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Sync code to EC2
+        run: |
+          rsync -avz --delete ./ ${{ secrets.EC2_USER }}@${{ github.event.inputs.EC2_HOST }}:/var/www/minhaapp
+
+      - name: Run deploy on EC2 (Docker Compose)
+        run: |
+          ssh ${{ secrets.EC2_USER }}@${{ github.event.inputs.EC2_HOST }} << 'EOF'
+            cd /var/www/minhaapp
+            docker compose up -d --build || docker-compose up -d --build
+          EOF
