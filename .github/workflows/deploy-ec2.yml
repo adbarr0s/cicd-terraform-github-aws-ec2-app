@@ -1,16 +1,15 @@
 name: Deploy app to EC2
 
 on:
-  workflow_dispatch:
-    inputs:
-      EC2_HOST:
-        description: "EC2 public IP or DNS"
-        required: true
-        type: string
+  repository_dispatch:
+    types: [deploy-app]   # será disparado pelo repo de Terraform
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
+    env:
+      EC2_HOST: ${{ github.event.client_payload.EC2_HOST }}
 
     steps:
       - name: Checkout app code
@@ -21,15 +20,15 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ github.event.inputs.EC2_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts
 
       - name: Sync code to EC2
         run: |
-          rsync -avz --delete ./ ${{ secrets.EC2_USER }}@${{ github.event.inputs.EC2_HOST }}:/var/www/minhaapp
+          rsync -avz --delete ./ ${{ secrets.EC2_USER }}@"$EC2_HOST":/var/www/minhaapp
 
       - name: Run deploy on EC2 (Docker Compose)
         run: |
-          ssh ${{ secrets.EC2_USER }}@${{ github.event.inputs.EC2_HOST }} << 'EOF'
+          ssh ${{ secrets.EC2_USER }}@"$EC2_HOST" << 'EOF'
             cd /var/www/minhaapp
             docker compose up -d --build || docker-compose up -d --build
           EOF
