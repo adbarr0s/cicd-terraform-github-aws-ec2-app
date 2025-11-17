@@ -1,17 +1,29 @@
 name: Deploy app to EC2
 
 on:
-  repository_dispatch:
-    types: [deploy-app]   # será disparado pelo repo de Terraform
+  workflow_dispatch:                      # permite correr manualmente
+    inputs:
+      EC2_HOST:
+        description: "EC2 public IP or DNS"
+        required: true
+        type: string
+
+  repository_dispatch:                    # chamado pela pipeline de Terraform
+    types: [deploy-app]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     env:
-      EC2_HOST: ${{ github.event.client_payload.EC2_HOST }}
+      # Se vier de repository_dispatch usa client_payload;
+      # se for manual (workflow_dispatch) usa o input EC2_HOST
+      EC2_HOST: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.EC2_HOST || github.event.inputs.EC2_HOST }}
 
     steps:
+      - name: Mostrar IP de destino
+        run: echo "Deploying to EC2_HOST=$EC2_HOST"
+
       - name: Checkout app code
         uses: actions/checkout@v4
 
