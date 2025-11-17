@@ -42,9 +42,15 @@ jobs:
         run: |
           rsync -avz --delete ./ ${{ secrets.EC2_USER }}@"$EC2_HOST":/var/www/minhaapp
 
-      - name: Run deploy on EC2 (Docker Compose)
+      - name: Instalar o Docker na maquina
         run: |
-          ssh ${{ secrets.EC2_USER }}@"$EC2_HOST" << 'EOF'
-            cd /var/www/minhaapp
-            docker compose up -d --build || docker-compose up -d --build
-          EOF
+          sudo dnf install -y docker
+          sudo systemctl enable docker
+          sudo systemctl start docker
+          
+      - name: Copiar a imagem do Docker Hub
+        run: |
+          sudo docker run -d -p 8082:8080 --name DevOpsJenkins jenkins/jenkins:lts-jdk17
+          sudo docker start DevOpsJenkins
+          
+      
