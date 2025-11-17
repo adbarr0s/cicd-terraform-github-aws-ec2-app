@@ -1,14 +1,14 @@
 name: Deploy app to EC2
 
 on:
-  workflow_dispatch:                      # permite correr manualmente
+  workflow_dispatch:
     inputs:
       EC2_HOST:
         description: "EC2 public IP or DNS"
         required: true
         type: string
 
-  repository_dispatch:                    # chamado pela pipeline de Terraform
+  repository_dispatch:
     types: [deploy-app]
 
 jobs:
@@ -16,8 +16,6 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      # Se vier de repository_dispatch usa client_payload;
-      # se for manual (workflow_dispatch) usa o input EC2_HOST
       EC2_HOST: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.EC2_HOST || github.event.inputs.EC2_HOST }}
 
     steps:
@@ -42,15 +40,39 @@ jobs:
         run: |
           rsync -avz --delete ./ ${{ secrets.EC2_USER }}@"$EC2_HOST":/var/www/minhaapp
 
-      - name: Instalar o Docker na maquina
+      # AGORA sim: instalar Docker NA EC2
+      - name: Instalar Docker na EC2
         run: |
-          sudo dnf install -y docker
-          sudo systemctl enable docker
-          sudo systemctl start docker
-          
-      - name: Copiar a imagem do Docker Hub
+          ssh ${{ secrets.EC2_USER }}@"$EC2_HOST" << 'EOF'
+            set -e
+
+            # Detectar gestor de pacotes (Amazon Linux 2/2023 ou similar)
+            if command -v dnf >/dev/null 2>&1; then
+              sudo dnf update -y
+              sudo dnf install -y docker
+            elif command -v yum >/dev/null 2>&1; then
+              sudo yum update -y
+              sudo yum install -y docker
+            else
+              echo "Nem dnf nem yum encontrados. Verifica o SO da EC2."
+              exit 1
+            fi
+
+            sudo systemctl enable docker
+            sudo systemctl start docker
+          EOF
+
+      - name: Subir container Jenkins na EC2
         run: |
-          sudo docker run -d -p 8082:8080 --name DevOpsJenkins jenkins/jenkins:lts-jdk17
-          sudo docker start DevOpsJenkins
-          
-      
+          ssh ${{ secrets.EC2_USER }}@"$EC2_HOST" << 'EOF'
+            # Garantir que Docker está disponível
+            docker --version || { echo "Docker não está instalado corretamente"; exit 1; }
+
+            # Opcional: parar/remover container antigo
+            sudo docker stop DevOpsJenkins || true
+            sudo docker rm DevOpsJenkins || true
+
+            # Puxar imagem e subir container
+            sudo docker pull jenkins/jenkins:lts-jdk17
+            sudo docker run -d -p 8082:8080 --name DevOpsJenkins jenkins/jenkins:lts-jdk17
+          EOF
