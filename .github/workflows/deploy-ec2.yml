@@ -34,6 +34,10 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts
 
+      - name: Preparar diretório da app no EC2
+        run: |
+          ssh ${{ secrets.EC2_USER }}@"$EC2_HOST" "sudo mkdir -p /var/www/minhaapp && sudo chown -R \$USER:\$USER /var/www/minhaapp"
+
       - name: Sync code to EC2
         run: |
           rsync -avz --delete ./ ${{ secrets.EC2_USER }}@"$EC2_HOST":/var/www/minhaapp
