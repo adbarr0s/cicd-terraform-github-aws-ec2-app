@@ -76,5 +76,5 @@ jobs:
 
             # Puxar imagem e subir container
             sudo docker pull jenkins/jenkins:lts-jdk17
-            sudo docker run -d -p 8082:8080 --name DevOpsJenkins jenkins/jenkins:lts-jdk17
+            sudo docker run -d -p 80:8080 --name DevOpsJenkins jenkins/jenkins:lts-jdk17
           EOF
